@@ -1,0 +1,118 @@
+# 1. Activación: Se debe activar manualmente y permitir al usuario elegir si quiere ejecutar los "Tests de Seguridad" (sí/no).
+
+name: Primer ejercicio 
+
+on:
+  workflow_dispatch:
+    inputs:
+      ejecutar_tests:
+        description: '¿Desea ejecutar los tests de seguridad?'
+        required: true
+        type: boolean
+
+ 
+jobs:
+  test_de_seguridad:
+    runs-on: ubuntu-latest
+    steps: 
+      
+      - name: Ejecutar los test de Seguridad
+        if: ${{ inputs.ejecutar_tests == true }}
+        run: echo "Ejecutando los tests de seguridad..."
+      
+      
+      - name: No ejecutar los test de seguridad
+        if: ${{ inputs.ejecutar_tests == false }}
+        run: echo "Se han saltado los tests de seguridad."
+
+
+
+
+
+# 2. Job 1 (CI & Seguridad):
+
+#     Debe correr en ubuntu-latest.
+#     Debe validar que el archivo ventas.json es un JSON válido.
+#     Condicional: Solo si el usuario marcó "sí" en el input inicial, debe ejecutar un script de Python que simule un escaneo de seguridad buscando claves API expuestas.
+
+jobs:
+  ci_seguridad:
+    name: Job 1 - CI & Seguridad
+    runs-on: ubuntu-latest
+    steps:
+     
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+     
+      - name: Validar estructura de ventas.json
+        run: |
+          echo "Comprobando que el archivo es un JSON válido..."
+          python -m json.tool ventas.json > /dev/null
+          echo "¡Archivo JSON validado con éxito!"
+
+      
+      - name: Escaneo de Seguridad (Claves API)
+        
+        if: ${{ inputs.ejecutar_tests == true }} 
+        run: |
+          echo "Iniciando escaneo de seguridad..."
+          python escaneo_seguridad.py
+
+
+
+# 3. Job 2 (Procesamiento):
+
+#     Depende del Job 1.
+#     Debe usar una Matrix para simular el procesamiento en dos entornos: staging y production
+#     Debe generar un archivo de reporte .txt diferente para cada entorno.
+#     Debe subir los reportes como artefactos para que el jefe de departamento pueda descargarlos.
+
+
+
+  procesamiento:
+    name: Job 2 - Procesamiento
+    
+    needs: ci_seguridad 
+    runs-on: ubuntu-latest
+    
+    
+    strategy:
+      matrix:
+        entorno: [staging, production]
+        
+    steps:
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Crear reporte del entorno
+        run: |
+          echo "Simulando procesamiento de datos en ${{ matrix.entorno }}..."
+          echo "Este es el reporte detallado para el entorno de ${{ matrix.entorno }}" > reporte_${{ matrix.entorno }}.txt
+          echo "¡Reporte generado!"
+
+      - name: Subir reporte a Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Reporte-${{ matrix.entorno }}
+          path: reporte_${{ matrix.entorno }}.txt
+
+
+
+# Job 3 (Notificación de Éxito):
+
+#     Se ejecuta solo si los anteriores terminaron bien.
+#     Debe usar un Secreto llamado DISCORD_WEBHOOK para simular el envío de una notificación (un simple echo de la URL enmascarada bastará).
+
+  notificacion:
+    name: Job 3 - Notificación de éxito
+    needs: procesamiento 
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Enviar Notificación a Discord
+        run: |
+          echo "Todos los jobs anteriores se ejecutaron correctamente."
+          echo "Enviando notificación al Webhook de Discord:"
+          # Imprimimos la variable del secreto (se mostrará como *** en los logs)
+          echo "${{ secrets.DISCORD_WEBHOOK }}"
